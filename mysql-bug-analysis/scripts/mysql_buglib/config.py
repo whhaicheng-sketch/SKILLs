@@ -81,7 +81,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "allow_source_instrumentation": True,
         "allow_dbug_injection": True,
         "allow_debug_sync": True,
-        "allow_fault_injection": True,
+        "allow_fault_injection": False,
     },
     "research": {
         "official_sources_only_for_final_conclusions": True,

@@ -32,6 +32,19 @@ class SkillLayoutTests(unittest.TestCase):
         self.assertIn('display_name: "MySQL BUG Analysis"', text)
         self.assertIn("$mysql-bug-analysis", text)
 
+    def test_primary_guidance_uses_database_diagnostic_language(self):
+        text = (ROOT / "SKILL.md").read_text(encoding="utf-8")
+        lowered = text.lower()
+        self.assertNotIn("fault injection", lowered)
+        self.assertNotIn("network or process failure", lowered)
+        for capability in ["gdb", "core", "mtr", "dbug", "debug sync"]:
+            self.assertIn(capability, lowered)
+
+        config = (ROOT / "config" / "mysql-bug-skill.example.yaml").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("allow_fault_injection: false", config)
+
 
 if __name__ == "__main__":
     unittest.main()
