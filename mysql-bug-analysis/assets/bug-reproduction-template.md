@@ -149,7 +149,7 @@ python3 scripts/mysql_bug.py gdb --bug-id {{BUG_ID}} --mode core --mysqld <PATH>
 
 ## 13. MTR、插桩和故障注入
 
-正常复现失败时依次尝试：官方 MTR、Debug Sync/DBUG、最小插桩、扩大竞态窗口、受控故障注入。所有修改必须保存 patch，并标记证据等级。
+正常复现失败时依次尝试：官方 MTR、Debug Sync/DBUG、最小插桩、扩大竞态窗口、隔离实例内的受控异常状态模拟。所有修改必须保存 patch，并标记证据等级。
 
 ## 14. 修复版本验证
 

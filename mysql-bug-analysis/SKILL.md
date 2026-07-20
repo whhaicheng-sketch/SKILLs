@@ -1,13 +1,13 @@
 ---
 name: mysql-bug-analysis
-description: Use when investigating a MySQL defect, crash, assertion, hang, deadlock, wrong result, corruption, startup failure, replication failure, or performance regression that requires official BUG and release evidence, affected and fixed version determination, local source builds, reproduction, GDB/core/MTR debugging, source or patch analysis, and reproducible Markdown reports.
+description: Use when a MySQL server defect or version upgrade problem requires official evidence, local source builds, reproducible diagnosis, version comparison, or source-level analysis.
 ---
 
 # MySQL BUG Analysis
 
 ## Objective
 
-Investigate MySQL BUGs as evidence-backed engineering cases. Prefer real reproduction and dynamic debugging; when that is impossible, continue through MTR, instrumentation, fault injection, official patch analysis, and version-pinned static source analysis. Never present inference as experiment.
+Investigate MySQL BUGs as evidence-backed database engineering cases. Prefer real reproduction and dynamic debugging; when that is impossible, continue through MTR, instrumentation, controlled failure simulation, official patch analysis, and version-pinned static source analysis. Never present inference as experiment.
 
 ## Required outputs
 
@@ -132,7 +132,7 @@ Use this order:
 3. GDB batch launch or attach.
 4. Targeted conditional breakpoints and variable capture.
 5. Minimal managed-copy instrumentation.
-6. Sanitizer or controlled fault injection.
+6. Sanitizer or controlled database failure simulation.
 
 ```bash
 python3 scripts/mysql_bug.py gdb --bug-id <ID> --mode launch --instance-manifest <MANIFEST> --breakpoint <FUNCTION> --config <CONFIG>
@@ -142,7 +142,7 @@ python3 scripts/mysql_bug.py gdb --bug-id <ID> --mode core --mysqld <MYSQLD> --c
 
 Capture the earliest invalid object/state, ownership/lifetime transition, missing error check, lock/latch relationship, transaction transition, or race ordering. The final assertion/SIGSEGV/wait is usually not the root cause.
 
-### 8. Use MTR, instrumentation, or fault injection when necessary
+### 8. Use MTR, instrumentation, or controlled failure simulation when necessary
 
 Read [references/mtr-playbook.md](references/mtr-playbook.md) and [references/fault-injection.md](references/fault-injection.md).
 
@@ -150,7 +150,7 @@ Read [references/mtr-playbook.md](references/mtr-playbook.md) and [references/fa
 python3 scripts/mysql_bug.py mtr --bug-id <ID> --source-dir <SOURCE> --test <SUITE.TEST> --config <CONFIG>
 ```
 
-Search BUG ID, error text, symbols, DBUG tokens, and official added tests. Save every instrumentation patch and explain how it changes timing or conditions. Forced trigger evidence is L2, not natural production-frequency proof.
+Search BUG ID, error text, symbols, DBUG or Debug Sync points, and official added tests. Save every instrumentation patch and explain how it changes timing or conditions. Forced trigger evidence is L2, not natural production-frequency proof.
 
 ### 9. Analyze source and fix
 
@@ -212,9 +212,8 @@ Automatic execution does not remove safety controls. Never:
 - stop or restart system `mysql`/`mysqld` services;
 - modify existing source for instrumentation;
 - delete outside configured roots or without `.mysql-bug-skill-owned`;
-- disable SELinux, AppArmor, firewall, ptrace protection, or other security controls;
-- make persistent kernel/security changes;
-- expose credentials in commands, evidence, or reports.
+- weaken host protection settings or make persistent system-policy changes;
+- expose secrets in commands, evidence, or reports.
 
 Use process-local settings, independent runtimes, managed source copies, and manifest-owned PIDs only.
 

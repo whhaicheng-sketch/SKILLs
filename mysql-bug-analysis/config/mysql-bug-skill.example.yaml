@@ -77,7 +77,7 @@ debug:
   allow_source_instrumentation: true
   allow_dbug_injection: true
   allow_debug_sync: true
-  allow_fault_injection: true
+  allow_fault_injection: false
 
 research:
   official_sources_only_for_final_conclusions: true

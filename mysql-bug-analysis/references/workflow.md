@@ -37,7 +37,7 @@ Start from official steps or official MTR, then user steps, then a minimized sce
 
 ### DEBUG
 
-Use this order: error log/backtrace -> core -> GDB batch -> targeted interactive GDB -> source instrumentation -> sanitizer -> controlled fault injection. Capture the earliest invalid state, not only the terminal crash.
+Use this order: error log/backtrace -> core -> GDB batch -> targeted interactive GDB -> source instrumentation -> sanitizer -> controlled database failure simulation. Capture the earliest invalid state, not only the terminal failure.
 
 ### SOURCE_ANALYSIS
 
@@ -61,7 +61,7 @@ Generate exactly two primary Markdown deliverables for BUG investigations (not s
 2. Run or reconstruct the official MTR.
 3. Add minimal logging or conditional GDB breakpoints.
 4. Use Debug Sync/DBUG or a controlled sleep to expose the race window.
-5. Perform controlled I/O, allocation, network, process, or timing fault injection.
+5. Simulate a scoped I/O, allocation, connection, process, or timing failure inside the owned test instance.
 6. Reverse-engineer the repair from the official patch and test.
 7. Perform static call-chain analysis and lower confidence.
 
