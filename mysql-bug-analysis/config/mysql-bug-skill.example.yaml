@@ -1,0 +1,119 @@
+schema_version: 1
+
+skill:
+  name: mysql-bug-analysis
+  language: zh-CN
+  execution_mode: automatic
+  primary_version_family: "8.0"
+
+paths:
+  source_root: /data/mysql-source
+  managed_source_root: /data/mysql-source/managed
+  build_root: /data/mysql-build
+  install_root: /data/mysql-install
+  runtime_root: /data/mysql-bug-runtime
+  workspace_root: /data/mysql-bug-workspace
+  report_root: /data/mysql-bug-reports
+  cache_root: /data/mysql-bug-cache
+
+source:
+  layout: per-version-directory
+  local_directory_patterns:
+    - "mysql-{version}"
+    - "mysql-server-{version}"
+    - "{version}"
+  official_repository: "https://github.com/mysql/mysql-server.git"
+  clone_depth: 1
+  allow_download: true
+  preserve_existing_sources: true
+  allow_instrument_existing_source: false
+
+build:
+  default_type: Debug
+  generator: Ninja
+  parallel_jobs: 16
+  clean_build: false
+  reuse_existing_build: true
+  install_after_build: true
+  cmake_common_options:
+    - "-DCMAKE_BUILD_TYPE=Debug"
+    - "-DWITH_DEBUG=1"
+    - "-DWITH_UNIT_TESTS=ON"
+  version_specific_options:
+    "5.7":
+      - "-DDOWNLOAD_BOOST=1"
+      - "-DWITH_BOOST=/data/mysql-bug-cache/boost"
+    "8.0": []
+    "8.4": []
+
+runtime:
+  mysql_user: ""
+  bind_address: 127.0.0.1
+  port_range:
+    start: 34060
+    end: 34160
+  initialize_mode: initialize-insecure
+  startup_timeout_seconds: 120
+  shutdown_timeout_seconds: 60
+  reproduction_timeout_seconds: 600
+  default_server_options:
+    - "--skip-name-resolve"
+  enable_core_dump: true
+  cleanup_after_success: false
+  cleanup_after_failure: false
+
+debug:
+  debugger: gdb
+  gdb_path: /usr/bin/gdb
+  batch_mode: true
+  enable_pretty_printing: true
+  collect_all_thread_backtraces: true
+  collect_full_backtraces: true
+  enable_sanitizers: false
+  allowed_sanitizers:
+    - address
+    - undefined
+    - thread
+  allow_source_instrumentation: true
+  allow_dbug_injection: true
+  allow_debug_sync: true
+  allow_fault_injection: true
+
+research:
+  official_sources_only_for_final_conclusions: true
+  allow_secondary_sources_as_leads: true
+  save_web_evidence: true
+  save_release_notes: true
+  save_bug_page: true
+  save_commit_diff: true
+
+reports:
+  format: markdown
+  output_files:
+    analysis: "BUG-{bug_id}-analysis.md"
+    reproduction: "BUG-{bug_id}-reproduction.md"
+  include_command_output: true
+  include_failed_attempts: true
+  include_evidence_index: true
+  include_absolute_paths: true
+  redact_secrets: true
+
+safety:
+  require_ownership_marker: true
+  ownership_marker: .mysql-bug-skill-owned
+  prohibit_existing_instance_datadir: true
+  prohibit_system_mysql_service_changes: true
+  prohibit_package_removal: true
+  prohibit_firewall_changes: true
+  prohibit_selinux_disable: true
+  prohibit_app_armor_disable: true
+  allow_dependency_installation: false
+  allow_root_commands: false
+  disk_free_minimum_gb: 30
+  memory_free_minimum_gb: 4
+
+logging:
+  level: INFO
+  command_log: true
+  environment_log: true
+  timestamps: true

@@ -1,0 +1,19 @@
+name: minimal-reproduction
+setup:
+  sql:
+    - sql/prepare.sql
+sessions:
+  session_a:
+    steps:
+      - sql: "START TRANSACTION"
+      - signal: a_ready
+      - wait_for: b_done
+      - sql: "COMMIT"
+  session_b:
+    steps:
+      - wait_for: a_ready
+      - sql_file: sql/session-b.sql
+      - signal: b_done
+success_criteria:
+  error_log_contains:
+    - "replace-with-target-signature"
