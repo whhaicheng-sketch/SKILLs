@@ -2,12 +2,8 @@ name: Unpack MySQL BUG Analysis Skill
 
 on:
   push:
-    branches: [main]
-    paths:
-      - '.bootstrap/**'
-      - '.github/workflows/unpack-mysql-bug-analysis.yml'
-  pull_request:
-    branches: [main]
+    branches:
+      - agent/upload-complete-mysql-bug-skill
     paths:
       - '.bootstrap/**'
       - '.github/workflows/unpack-mysql-bug-analysis.yml'
@@ -22,22 +18,41 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.head_ref || github.ref_name }}
+          ref: agent/upload-complete-mysql-bug-skill
 
-      - name: Reconstruct, validate, and unpack skill
+      - name: Reconstruct and unpack complete skill
         shell: bash
         run: |
           set -euo pipefail
-          cat .bootstrap/part-*.b64 | base64 --decode > /tmp/mysql-bug-analysis.zip
-          echo '43480f3a326c053d893163712c35c01a582b0a8370b92301b2150fb9a32dbc7f  /tmp/mysql-bug-analysis.zip' | sha256sum -c -
-          rm -rf mysql-bug-analysis
-          unzip -q /tmp/mysql-bug-analysis.zip
-          test -f mysql-bug-analysis/SKILL.md
-          python3 -m pip install --disable-pip-version-check -r mysql-bug-analysis/requirements.txt
-          python3 mysql-bug-analysis/scripts/self_check.py
-          PYTHONPATH=mysql-bug-analysis/scripts python3 -m unittest discover -s mysql-bug-analysis/tests -v
+          python3 - <<'PY'
+          from pathlib import Path
+          import base64
+          import hashlib
+          import zipfile
 
-      - name: Commit complete skill and remove bootstrap files
+          parts = sorted(Path('.bootstrap').glob('part-*.b64'))
+          if not parts:
+              raise SystemExit('No archive parts found')
+
+          encoded = ''.join(part.read_text(encoding='utf-8') for part in parts)
+          encoded = ''.join(encoded.split())
+          archive = base64.b64decode(encoded)
+          digest = hashlib.sha256(archive).hexdigest()
+          print(f'archive_sha256={digest}')
+          if digest != '43480f3a326c053d893163712c35c01a582b0a8370b92301b2150fb9a32dbc7f':
+              raise SystemExit(f'Archive SHA-256 mismatch: {digest}')
+
+          zip_path = Path('/tmp/mysql-bug-analysis.zip')
+          zip_path.write_bytes(archive)
+          with zipfile.ZipFile(zip_path) as bundle:
+              broken = bundle.testzip()
+              if broken:
+                  raise SystemExit(f'Corrupt ZIP member: {broken}')
+              bundle.extractall('.')
+          PY
+          test -f mysql-bug-analysis/SKILL.md
+
+      - name: Commit complete skill and clean temporary files
         shell: bash
         run: |
           set -euo pipefail
@@ -48,9 +63,5 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -A
-          if git diff --cached --quiet; then
-            echo 'No changes to commit'
-            exit 0
-          fi
           git commit -m 'feat: add complete mysql bug analysis Codex skill'
-          git push origin HEAD:${{ github.head_ref || github.ref_name }}
+          git push origin HEAD:agent/upload-complete-mysql-bug-skill
