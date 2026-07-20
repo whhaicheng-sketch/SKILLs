@@ -1,0 +1,25 @@
+parts=7
+part-000.b64: chars=8000 first='UEsDBBQAAAAI' last='48HoqiQNDQ15'
+part-001.b64: chars=8000 first='PT94JcBTM1gB' last='BU8kHNDlTDRp'
+part-002.b64: chars=16000 first='SUxTxxYS+1DL' last='z+Jeg3hIjWKY'
+part-003.b64: chars=16000 first='Q3JiTKsul0z1' last='L5XTV6LeCBTd'
+part-004.b64: chars=16000 first='JtAAgX+M6H4M' last='kKTQdryE+H59'
+part-005.b64: chars=16000 first='993nS2Z0wTjP' last='KNk1b2Yqshob'
+part-006.b64: chars=11636 first='WSldjCqsRYV1' last='ABD3AAAAAA=='
+encoded_chars=91636 remainder=0
+archive_bytes=68725
+archive_sha256=9d01db47df722cdcf53b378dc633091deb13bdf221f02bdd8797b7fc68a88abe
+zip_members=59
+Traceback (most recent call last):
+  File "<stdin>", line 25, in <module>
+  File "/usr/lib/python3.12/zipfile/__init__.py", line 1536, in testzip
+    while f.read(chunk_size):     # Check CRC-32
+          ^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/zipfile/__init__.py", line 1005, in read
+    data = self._read1(n)
+           ^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/zipfile/__init__.py", line 1081, in _read1
+    data = self._decompressor.decompress(data, n)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+zlib.error: Error -3 while decompressing data: invalid code lengths set
+
