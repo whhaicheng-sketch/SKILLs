@@ -3,7 +3,7 @@ name: Unpack MySQL BUG Analysis Skill
 on:
   push:
     branches:
-      - agent/upload-complete-mysql-bug-skill
+      - main
     paths:
       - '.bootstrap/**'
       - '.github/workflows/unpack-mysql-bug-analysis.yml'
@@ -18,7 +18,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: agent/upload-complete-mysql-bug-skill
+          ref: main
 
       - name: Reconstruct and unpack complete skill
         shell: bash
@@ -51,6 +51,9 @@ jobs:
               bundle.extractall('.')
           PY
           test -f mysql-bug-analysis/SKILL.md
+          python3 -m pip install --disable-pip-version-check -r mysql-bug-analysis/requirements.txt
+          python3 mysql-bug-analysis/scripts/self_check.py
+          PYTHONPATH=mysql-bug-analysis/scripts python3 -m unittest discover -s mysql-bug-analysis/tests -v
 
       - name: Commit complete skill and clean temporary files
         shell: bash
@@ -64,4 +67,4 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -A
           git commit -m 'feat: add complete mysql bug analysis Codex skill'
-          git push origin HEAD:agent/upload-complete-mysql-bug-skill
+          git push origin HEAD:main
