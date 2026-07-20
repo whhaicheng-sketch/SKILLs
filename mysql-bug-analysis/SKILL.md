@@ -44,6 +44,10 @@ The user may provide only a BUG ID, URL, description, error log, core, version, 
 
 Read [references/workflow.md](references/workflow.md) at task start and follow its state machine. Do not silently skip `BASELINE`, source evidence, fix validation, confidence grading, or report quality checks. If a phase is impossible or inapplicable, record it with `skip-phase --phase <PHASE> --reason '<REASON>'`, explain the limitation, and lower confidence; never mark it completed.
 
+## Progress reporting
+
+Keep the user informed throughout long-running investigations. Treat 30 minutes as the maximum interval between progress updates while work is active, not as a fixed schedule. Report sooner when a phase completes, a command fails, the investigation becomes blocked, the working hypothesis changes, or material evidence appears. Each update should state the current phase, concrete evidence or progress since the previous update, whether the active process is healthy, and the next action. Do not claim that a process is still running without checking its current state. If the execution environment cannot send unsolicited updates after a turn ends, explain that limitation and report whenever control returns.
+
 ### 1. Initialize and discover
 
 ```bash
