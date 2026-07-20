@@ -1,0 +1,4 @@
+interface:
+  display_name: "MySQL BUG Analysis"
+  short_description: "Investigate MySQL bugs with source and GDB"
+  default_prompt: "Use $mysql-bug-analysis to investigate this MySQL bug, reproduce it, identify the root cause, and generate both Markdown reports."
