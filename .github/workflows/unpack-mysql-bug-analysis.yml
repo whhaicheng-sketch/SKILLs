@@ -41,3 +41,5 @@ jobs:
           fi
           git commit -m 'feat: add mysql bug analysis Codex skill'
           git push
+
+# Triggered after all archive chunks are present.
