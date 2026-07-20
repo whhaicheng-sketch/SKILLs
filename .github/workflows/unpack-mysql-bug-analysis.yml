@@ -1,4 +1,4 @@
-name: Finalize MySQL BUG Analysis Skill
+name: Diagnose MySQL BUG Analysis Skill Archive
 
 on:
   pull_request:
@@ -11,50 +11,77 @@ permissions:
   contents: write
 
 jobs:
-  finalize:
+  diagnose:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           ref: agent/finalize-mysql-bug-skill
 
-      - name: Reconstruct and unpack complete skill
+      - name: Diagnose archive and unpack when valid
         shell: bash
         run: |
-          set -euo pipefail
+          set -u
           python3 - <<'PY'
           from pathlib import Path
           import base64
+          import hashlib
+          import traceback
           import zipfile
 
-          parts = sorted(Path('.bootstrap').glob('part-*.b64'))
-          if not parts:
-              raise SystemExit('No archive parts found')
-          encoded = ''.join(part.read_text(encoding='utf-8') for part in parts)
-          encoded = ''.join(encoded.split())
-          archive = base64.b64decode(encoded, validate=False)
-          zip_path = Path('/tmp/mysql-bug-analysis.zip')
-          zip_path.write_bytes(archive)
-          with zipfile.ZipFile(zip_path) as bundle:
-              broken = bundle.testzip()
-              if broken:
-                  raise SystemExit(f'Corrupt ZIP member: {broken}')
-              bundle.extractall('.')
+          log = []
+          success = False
+          try:
+              parts = sorted(Path('.bootstrap').glob('part-*.b64'))
+              log.append(f'parts={len(parts)}')
+              for part in parts:
+                  text = part.read_text(encoding='utf-8')
+                  log.append(f'{part.name}: chars={len(text)} first={text[:12]!r} last={text[-12:]!r}')
+              encoded = ''.join(part.read_text(encoding='utf-8') for part in parts)
+              encoded = ''.join(encoded.split())
+              log.append(f'encoded_chars={len(encoded)} remainder={len(encoded) % 4}')
+              archive = base64.b64decode(encoded, validate=False)
+              log.append(f'archive_bytes={len(archive)}')
+              log.append(f'archive_sha256={hashlib.sha256(archive).hexdigest()}')
+              zip_path = Path('/tmp/mysql-bug-analysis.zip')
+              zip_path.write_bytes(archive)
+              with zipfile.ZipFile(zip_path) as bundle:
+                  log.append(f'zip_members={len(bundle.namelist())}')
+                  broken = bundle.testzip()
+                  log.append(f'zip_test={broken!r}')
+                  if broken:
+                      raise RuntimeError(f'Corrupt ZIP member: {broken}')
+                  bundle.extractall('.')
+              required = [
+                  Path('mysql-bug-analysis/SKILL.md'),
+                  Path('mysql-bug-analysis/scripts/mysql_bug.py'),
+                  Path('mysql-bug-analysis/tests'),
+              ]
+              for item in required:
+                  log.append(f'{item}: exists={item.exists()}')
+              success = all(item.exists() for item in required)
+          except Exception:
+              log.append(traceback.format_exc())
+          Path('finalize-diagnostic.txt').write_text('\n'.join(log) + '\n', encoding='utf-8')
+          Path('finalize-success.txt').write_text('yes\n' if success else 'no\n', encoding='utf-8')
           PY
-          test -f mysql-bug-analysis/SKILL.md
-          test -f mysql-bug-analysis/scripts/mysql_bug.py
-          test -d mysql-bug-analysis/tests
 
-      - name: Commit complete skill and remove temporary files
+      - name: Commit diagnostic or complete skill
         shell: bash
         run: |
           set -euo pipefail
-          rm -rf .bootstrap
-          rm -f .github/workflows/unpack-mysql-bug-analysis.yml
-          rmdir .github/workflows 2>/dev/null || true
-          rmdir .github 2>/dev/null || true
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -A
-          git commit -m 'feat: add complete mysql bug analysis Codex skill'
+          if grep -qx yes finalize-success.txt; then
+            rm -rf .bootstrap
+            rm -f .github/workflows/unpack-mysql-bug-analysis.yml
+            rm -f finalize-success.txt
+            rmdir .github/workflows 2>/dev/null || true
+            rmdir .github 2>/dev/null || true
+            git add -A
+            git commit -m 'feat: add complete mysql bug analysis Codex skill'
+          else
+            git add finalize-diagnostic.txt finalize-success.txt
+            git commit -m 'chore: record skill archive diagnostic'
+          fi
           git push origin HEAD:agent/finalize-mysql-bug-skill
