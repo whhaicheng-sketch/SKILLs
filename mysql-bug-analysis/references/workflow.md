@@ -2,7 +2,9 @@
 
 ## State machine
 
-`DISCOVER -> RESEARCH -> VERSION_RESOLUTION -> PREPARE -> BASELINE -> REPRODUCE -> DEBUG -> SOURCE_ANALYSIS -> FIX_VALIDATION -> CONCLUSION -> REPORT`
+`DISCOVER -> RESEARCH -> VERSION_RESOLUTION -> PREPARE -> BASELINE -> REPRODUCE -> DEBUG -> SOURCE_ANALYSIS -> FIX_VALIDATION -> CONCLUSION -> REPORT -> COMPLETE`
+
+Transitions are ordered. A successful phase may be completed idempotently for additional roles. An unavailable or inapplicable phase must be skipped explicitly with a preserved reason; a failed command never completes a phase.
 
 ## Phase contracts
 
@@ -51,7 +53,7 @@ Assign L1-L5 using `references/evidence-rules.md`. Tag each claim as `[实验验
 
 ### REPORT
 
-Generate exactly two primary Markdown deliverables. Populate every material section; retain failed experiments and limitations. Run the report quality gate in `references/report-contract.md`.
+Generate exactly two primary Markdown deliverables for BUG investigations (not skill-maintenance or audit tasks). Populate every material section; retain failed experiments and limitations. Run the report quality gate in `references/report-contract.md`.
 
 ## Degradation chain when natural reproduction fails
 

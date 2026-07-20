@@ -22,6 +22,27 @@ class StateTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 state.complete_phase("UNKNOWN")
 
+    def test_cannot_skip_required_phase(self):
+        with tempfile.TemporaryDirectory() as td:
+            state = TaskState.create("1", Path(td) / "state.json")
+            with self.assertRaises(ValueError):
+                state.complete_phase("BASELINE")
+
+    def test_skip_phase_requires_reason_and_preserves_audit_record(self):
+        with tempfile.TemporaryDirectory() as td:
+            state = TaskState.create("1", Path(td) / "state.json")
+            state.complete_phase("DISCOVER")
+            state.skip_phase("RESEARCH", "No public official BUG exists")
+            self.assertEqual(state.data["phase"], "VERSION_RESOLUTION")
+            self.assertEqual(state.data["skipped_phases"][0]["phase"], "RESEARCH")
+
+    def test_repeated_completion_is_idempotent_for_multi_role_work(self):
+        with tempfile.TemporaryDirectory() as td:
+            state = TaskState.create("1", Path(td) / "state.json")
+            state.complete_phase("DISCOVER")
+            state.complete_phase("DISCOVER")
+            self.assertEqual(state.data["phase"], "RESEARCH")
+
 
 if __name__ == "__main__":
     unittest.main()

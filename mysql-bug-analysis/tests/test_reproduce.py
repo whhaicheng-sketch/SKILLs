@@ -20,6 +20,22 @@ class ReproduceTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             validate_scenario(scenario)
 
+    def test_rejects_missing_success_criteria(self):
+        with self.assertRaises(ValueError):
+            validate_scenario({"sessions": {"a": {"steps": [{"sql": "SELECT 1"}]}}})
+
+    def test_rejects_unsupported_success_criterion(self):
+        with self.assertRaises(ValueError):
+            validate_scenario({"sessions": {}, "success_criteria": {"magic": True}})
+
+    def test_rejects_shell_steps_from_generic_scenarios(self):
+        with self.assertRaises(ValueError):
+            validate_scenario({"sessions": {"a": {"steps": [{"shell": "true"}]}}, "success_criteria": {"client_completed": True}})
+
+    def test_rejects_empty_error_signature(self):
+        with self.assertRaises(ValueError):
+            validate_scenario({"sessions": {}, "success_criteria": {"error_log_contains": []}})
+
 
 if __name__ == "__main__":
     unittest.main()
@@ -49,6 +65,8 @@ class PersistentSessionTests(unittest.TestCase):
             fake.chmod(0o755)
             scenario = root / "scenario.yaml"
             scenario.write_text(
+                "success_criteria:\n"
+                "  client_completed: true\n"
                 "sessions:\n"
                 "  a:\n"
                 "    steps:\n"

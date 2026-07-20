@@ -15,7 +15,7 @@
 
 - **L1:** affected version reproduces; fixed version passes the same trigger; dynamic and source evidence agree.
 - **L2:** MTR, instrumentation, Debug Sync, or fault injection triggers the mechanism; source/patch agrees.
-- **L3:** official BUG, official fix/test, and source call chain agree; local natural reproduction is absent.
+- **L3:** reviewed official BUG evidence, an official fix or added test, and the version-pinned source call chain agree; local natural reproduction is absent.
 - **L4:** static source analysis explains the symptom, but dynamic or fix evidence is incomplete.
 - **L5:** evidence supports only possible causes.
 

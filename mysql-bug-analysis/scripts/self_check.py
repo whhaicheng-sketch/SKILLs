@@ -62,6 +62,11 @@ def main() -> int:
     compile_result = subprocess.run([sys.executable, "-m", "compileall", "-q", str(ROOT / "scripts")], capture_output=True, text=True)
     if compile_result.returncode:
         errors.append(compile_result.stderr or compile_result.stdout)
+    import_result = subprocess.run(
+        [sys.executable, "-c", "import mysql_buglib; import mysql_buglib.state"], cwd=ROOT, capture_output=True, text=True
+    )
+    if import_result.returncode:
+        errors.append("mysql_buglib import smoke test failed: " + (import_result.stderr or import_result.stdout))
 
     if errors:
         print("SELF CHECK FAILED")

@@ -18,6 +18,14 @@ class ConfidenceTests(unittest.TestCase):
         result = evaluate_confidence({"source_evidence": True})
         self.assertEqual(result["level"], "L4")
 
+    def test_natural_reproduction_without_forced_trigger_is_not_l2(self):
+        result = evaluate_confidence({"reproduced": True, "source_evidence": True, "patch_evidence": True})
+        self.assertEqual(result["level"], "L4")
+
+    def test_l3_requires_official_fix_test_not_merely_any_official_file(self):
+        result = evaluate_confidence({"official_evidence": True, "source_evidence": True, "patch_evidence": True})
+        self.assertEqual(result["level"], "L4")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -30,7 +30,7 @@ from mysql_buglib.runtime import baseline, prepare_instance, start_instance, sto
 from mysql_buglib.safety import safe_remove_tree
 from mysql_buglib.source import acquire_source, find_local_source, create_instrumentation_copy
 from mysql_buglib.source_diff import source_diff
-from mysql_buglib.state import TaskState
+from mysql_buglib.state import PHASES, TaskState
 from mysql_buglib.validation import validate_fix
 from mysql_buglib.versions import resolve_version_roles
 from mysql_buglib.discovery import scan_source_trees
@@ -184,12 +184,14 @@ def cmd_validate_fix(args: argparse.Namespace) -> int:
         workspace = _workspace(config, args.bug_id)
         affected = _load_json(Path(args.affected_manifest))
         fixed = _load_json(Path(args.fixed_manifest))
-        client = _mysql_client(affected)
+        affected_client = _mysql_client(affected)
+        fixed_client = _mysql_client(fixed)
         evidence = workspace / "evidence" / "runtime" / "fix-validation"
-        result = validate_fix(Path(args.scenario), affected, fixed, client, evidence, iterations=args.iterations, timeout=args.timeout)
+        result = validate_fix(Path(args.scenario), affected, fixed, affected_client, fixed_client, evidence, iterations=args.iterations, timeout=args.timeout, path_coverage_artifact=Path(args.path_coverage_artifact) if args.path_coverage_artifact else None)
         state = _state(workspace)
         state.update(fix_validated=bool(result["validated"]))
-        state.complete_phase("FIX_VALIDATION")
+        if result["validated"]:
+            state.complete_phase("FIX_VALIDATION")
         metadata = _load_json(workspace / "metadata.json")
         metadata["fix_validation_status"] = "validated" if result["validated"] else "not-validated"
         metadata["affected_versions"] = [affected.get("version")]
@@ -292,7 +294,8 @@ def cmd_reproduce(args: argparse.Namespace) -> int:
         state = _state(workspace)
         if result["success"]:
             state.update(reproduced=True)
-        state.complete_phase("REPRODUCE")
+        if result["success"]:
+            state.complete_phase("REPRODUCE")
         return emit("reproduce", result["success"], result, phase="REPRODUCE", artifacts=[str(evidence / "result.json")], next_action="gdb" if result["success"] else "mtr-or-instrument")
     except Exception as exc:
         return fail("reproduce", exc, phase="REPRODUCE")
@@ -323,7 +326,8 @@ def cmd_gdb(args: argparse.Namespace) -> int:
                 pid = int(Path(manifest["pid_file"]).read_text().strip())
         evidence = workspace / "evidence" / ("core" if args.mode == "core" else "gdb") / args.mode
         result = run_gdb(gdb_path=Path(config["debug"]["gdb_path"]), mode=args.mode, mysqld=mysqld, evidence_dir=evidence, defaults_file=defaults, pid=pid, core_file=Path(args.core_file) if args.core_file else None, commands_file=Path(args.commands) if args.commands else None, breakpoints=args.breakpoint, timeout=args.timeout)
-        _state(workspace).complete_phase("DEBUG")
+        if result["success"]:
+            _state(workspace).complete_phase("DEBUG")
         return emit("gdb", result["success"], result, phase="DEBUG", artifacts=[str(evidence / "gdb-session.log")], next_action="source-analysis")
     except Exception as exc:
         return fail("gdb", exc, phase="DEBUG")
@@ -335,7 +339,9 @@ def cmd_source_diff(args: argparse.Namespace) -> int:
         workspace = _workspace(config, args.bug_id)
         result = source_diff(Path(args.before), Path(args.after), workspace / "evidence" / "patch", args.path, args.timeout)
         success = result.get("returncode") in (0, 1)
-        return emit("source-diff", success, result, phase="SOURCE_ANALYSIS", artifacts=[result["diff"]], next_action="analyze-fix-semantics" if success else "inspect diff execution error")
+        if success:
+            _state(workspace).complete_phase("SOURCE_ANALYSIS")
+        return emit("source-diff", success, result, phase="SOURCE_ANALYSIS", artifacts=[result["diff"]], next_action="validate-fix" if success else "inspect diff execution error")
     except Exception as exc:
         return fail("source-diff", exc, phase="SOURCE_ANALYSIS")
 
@@ -363,7 +369,8 @@ def _derive_evidence(workspace: Path, metadata: dict, state: dict) -> dict:
         "fix_validated": bool(state.get("fix_validated") or metadata.get("fix_validation_status") == "validated"),
         "dynamic_evidence": _has_files(workspace / "evidence" / "gdb") or _has_files(workspace / "evidence" / "core"),
         "source_evidence": bool(metadata.get("source_analysis_complete")) or _has_files(source_root, source_analysis_files),
-        "official_evidence": _has_files(workspace / "evidence" / "official"),
+        "official_evidence": bool(metadata.get("official_evidence_reviewed")),
+        "official_fix_test_evidence": bool(metadata.get("official_fix_test_evidence")),
         "patch_evidence": bool(metadata.get("patch_analysis_complete")) or _has_files(workspace / "evidence" / "patch", ("*.patch", "*.diff", "source.diff")),
         "mtr_or_fault_injection": _has_files(workspace / "evidence" / "mtr") or bool(metadata.get("fault_injection_used")),
     }
@@ -382,6 +389,7 @@ def cmd_confidence(args: argparse.Namespace) -> int:
         metadata["confidence_reason"] = result["reason"]
         _write_json(workspace / "metadata.json", metadata)
         state_obj.update(confidence_level=result["level"])
+        state_obj.complete_phase("CONCLUSION")
         return emit("confidence", True, {**result, "evidence": evidence}, phase="CONCLUSION", next_action="report")
     except Exception as exc:
         return fail("confidence", exc, phase="CONCLUSION")
@@ -419,6 +427,17 @@ def cmd_status(args: argparse.Namespace) -> int:
         return emit("status", True, result)
     except Exception as exc:
         return fail("status", exc)
+
+
+def cmd_skip_phase(args: argparse.Namespace) -> int:
+    try:
+        config = _cfg(args)
+        workspace = _workspace(config, args.bug_id, create=False)
+        state = _state(workspace)
+        state.skip_phase(args.phase, args.reason)
+        return emit("skip-phase", True, {"phase": args.phase, "reason": args.reason}, next_action=state.data["phase"])
+    except Exception as exc:
+        return fail("skip-phase", exc, phase=args.phase)
 
 
 def cmd_cleanup(args: argparse.Namespace) -> int:
@@ -507,12 +526,13 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("mtr"); add_common(p); p.add_argument("--source-dir", required=True); p.add_argument("--build-dir"); p.add_argument("--test", action="append", required=True); p.add_argument("--mtr-arg", action="append", default=[]); p.add_argument("--timeout", type=int, default=3600); p.set_defaults(func=cmd_mtr)
     p = sub.add_parser("gdb"); add_common(p); p.add_argument("--mode", choices=["launch", "attach", "core"], required=True); p.add_argument("--instance-manifest"); p.add_argument("--mysqld"); p.add_argument("--pid", type=int); p.add_argument("--core-file"); p.add_argument("--commands"); p.add_argument("--breakpoint", action="append", default=[]); p.add_argument("--timeout", type=int, default=1800); p.set_defaults(func=cmd_gdb)
     p = sub.add_parser("source-diff"); add_common(p); p.add_argument("--before", required=True); p.add_argument("--after", required=True); p.add_argument("--path", action="append"); p.add_argument("--timeout", type=int, default=600); p.set_defaults(func=cmd_source_diff)
-    p = sub.add_parser("validate-fix"); add_common(p); p.add_argument("--affected-manifest", required=True); p.add_argument("--fixed-manifest", required=True); p.add_argument("--scenario", required=True); p.add_argument("--iterations", type=int, default=10); p.add_argument("--timeout", type=int, default=600); p.set_defaults(func=cmd_validate_fix)
+    p = sub.add_parser("validate-fix"); add_common(p); p.add_argument("--affected-manifest", required=True); p.add_argument("--fixed-manifest", required=True); p.add_argument("--scenario", required=True); p.add_argument("--iterations", type=int, default=10); p.add_argument("--timeout", type=int, default=600); p.add_argument("--path-coverage-artifact"); p.set_defaults(func=cmd_validate_fix)
     p = sub.add_parser("collect"); add_common(p); p.add_argument("--file", required=True); p.add_argument("--category", choices=["official", "source", "build", "runtime", "mtr", "gdb", "core", "logs", "sql", "patch"], required=True); p.add_argument("--description"); p.set_defaults(func=cmd_collect)
-    p = sub.add_parser("confidence"); add_common(p); p.add_argument("--flag", action="append", choices=["reproduced", "fix_validated", "dynamic_evidence", "source_evidence", "official_evidence", "patch_evidence", "mtr_or_fault_injection"], default=[]); p.set_defaults(func=cmd_confidence)
+    p = sub.add_parser("confidence"); add_common(p); p.add_argument("--flag", action="append", choices=["reproduced", "fix_validated", "dynamic_evidence", "source_evidence", "official_evidence", "official_fix_test_evidence", "patch_evidence", "mtr_or_fault_injection"], default=[]); p.set_defaults(func=cmd_confidence)
     p = sub.add_parser("report"); add_common(p); p.add_argument("--force", action="store_true"); p.set_defaults(func=cmd_report)
     p = sub.add_parser("report-check"); add_common(p); p.set_defaults(func=cmd_report_check)
     p = sub.add_parser("status"); add_common(p); p.set_defaults(func=cmd_status)
+    p = sub.add_parser("skip-phase"); add_common(p); p.add_argument("--phase", choices=PHASES[:-2], required=True); p.add_argument("--reason", required=True); p.set_defaults(func=cmd_skip_phase)
     p = sub.add_parser("cleanup"); add_common(p); p.add_argument("--target", choices=["workspace", "runtime"], required=True); p.set_defaults(func=cmd_cleanup)
     p = sub.add_parser("analyze"); add_common(p); p.add_argument("--description"); p.add_argument("--title"); p.add_argument("--bug-url"); p.set_defaults(func=cmd_analyze)
     return parser

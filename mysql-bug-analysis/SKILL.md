@@ -11,7 +11,7 @@ Investigate MySQL BUGs as evidence-backed engineering cases. Prefer real reprodu
 
 ## Required outputs
 
-Complete every task with exactly two primary Markdown reports:
+For each BUG investigation, complete exactly two primary Markdown reports. Skill maintenance, audit, installation, and documentation tasks are not BUG investigations and do not produce these reports.
 
 1. `BUG-<id>-analysis.md` — symptom, trigger, affected/fixed versions, root cause, call chain, source and dynamic evidence, fix semantics, validation, workaround, limitations, confidence, and evidence index.
 2. `BUG-<id>-reproduction.md` — beginner-executable environment preparation, Debug build, isolated instance, baseline, reproduction, GDB/core/MTR, fixed-version comparison, cleanup, expected results, and troubleshooting.
@@ -32,17 +32,17 @@ Resolve YAML in this order:
 4. `~/.codex/mysql-bug-skill.yaml`
 5. built-in defaults
 
-Run before any managed action:
+Run before any managed action. Omit `--config` when using automatic configuration discovery:
 
 ```bash
-python3 scripts/mysql_bug.py config-check --config <CONFIG>
+python3 scripts/mysql_bug.py config-check [--config <CONFIG>]
 ```
 
 The user may provide only a BUG ID, URL, description, error log, core, version, SQL, reproduction steps, source directory, or binary. Automatically discover the remaining environment. Create a local ID such as `LOCAL-YYYYMMDD-NNN` when no official BUG ID exists.
 
 ## Mandatory workflow
 
-Read [references/workflow.md](references/workflow.md) at task start and follow its state machine. Do not skip `BASELINE`, source evidence, fix validation, confidence grading, or report quality checks merely because an official BUG appears to describe the answer.
+Read [references/workflow.md](references/workflow.md) at task start and follow its state machine. Do not silently skip `BASELINE`, source evidence, fix validation, confidence grading, or report quality checks. If a phase is impossible or inapplicable, record it with `skip-phase --phase <PHASE> --reason '<REASON>'`, explain the limitation, and lower confidence; never mark it completed.
 
 ### 1. Initialize and discover
 
@@ -113,7 +113,7 @@ Read [references/reproduction-scenario.md](references/reproduction-scenario.md).
 python3 scripts/mysql_bug.py reproduce --bug-id <ID> --instance-manifest <MANIFEST> --scenario <SCENARIO.YAML> --config <CONFIG>
 ```
 
-Define explicit success criteria: signal/core/assertion, process exit, required error text, wrong result, stable wait state, replication state, corruption check, or measured regression. On first success, minimize data, SQL, sessions, configuration, and time while retaining the failure.
+Define non-empty success criteria supported by the generic runner: `error_log_contains` or `client_completed`. Use a BUG-specific driver for signal/core, process exit, wrong result, stable wait state, replication state, corruption, or measured regression until typed runner support exists. On first success, minimize data, SQL, sessions, configuration, and time while retaining the failure.
 
 Each logical scenario session uses one persistent `mysql` client process, so transactions, locks, temporary tables, and session variables survive across that session's SQL steps. Use separate session names for independent connections; use a BUG-specific driver only when the scenario needs protocol behavior the generic runner cannot express.
 
@@ -169,10 +169,10 @@ Do not paste a patch without semantic analysis. Determine whether the patch repa
 Run the same minimized scenario on the candidate fixed version with equivalent configuration, data, concurrency, ordering, duration, and observation points. Confirm the trigger path was reached and the new branch/invariant held.
 
 ```bash
-python3 scripts/mysql_bug.py validate-fix --bug-id <ID> --affected-manifest <AFFECTED> --fixed-manifest <FIXED> --scenario <SCENARIO> --iterations 10 --config <CONFIG>
+python3 scripts/mysql_bug.py validate-fix --bug-id <ID> --affected-manifest <AFFECTED> --fixed-manifest <FIXED> --scenario <SCENARIO> --iterations 10 --path-coverage-artifact <ARTIFACT> --config <CONFIG>
 ```
 
-If local validation is absent, say `[官方确认]` rather than `[实验验证]`.
+Pass `--path-coverage-artifact` only with an existing artifact that proves the fixed build reached the trigger path and held the repaired invariant; the validator records its SHA-256. If local validation or a fixed release is unavailable, explicitly skip `FIX_VALIDATION` with a reason and use `[官方确认]`, `[补丁推导]`, or `[待验证]` as supported—never `[实验验证]`.
 
 ### 11. Grade evidence and write reports
 
@@ -224,4 +224,4 @@ python3 -m unittest discover -s tests -v
 python3 scripts/mysql_bug.py report-check --bug-id <ID> --config <CONFIG>
 ```
 
-Completion requires both Markdown reports, valid evidence links, explicit limitations, an L1-L5 rating, and no claim presented at a stronger evidence level than its artifacts support.
+BUG-investigation completion requires both Markdown reports, valid evidence links, explicit limitations, evidence labels, an L1-L5 rating, and no claim presented at a stronger evidence level than its artifacts support. Skipped phases and their reasons must appear in the limitations.
