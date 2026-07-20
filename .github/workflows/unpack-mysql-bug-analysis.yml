@@ -36,7 +36,11 @@ jobs:
               log.append(f'parts={len(parts)}')
               for part in parts:
                   text = part.read_text(encoding='utf-8')
-                  log.append(f'{part.name}: chars={len(text)} first={text[:12]!r} last={text[-12:]!r}')
+                  clean = ''.join(text.split())
+                  log.append(
+                      f'{part.name}: chars={len(clean)} sha256={hashlib.sha256(clean.encode()).hexdigest()} '
+                      f'first={clean[:12]!r} last={clean[-12:]!r}'
+                  )
               encoded = ''.join(part.read_text(encoding='utf-8') for part in parts)
               encoded = ''.join(encoded.split())
               log.append(f'encoded_chars={len(encoded)} remainder={len(encoded) % 4}')
@@ -75,7 +79,7 @@ jobs:
           if grep -qx yes finalize-success.txt; then
             rm -rf .bootstrap
             rm -f .github/workflows/unpack-mysql-bug-analysis.yml
-            rm -f finalize-success.txt
+            rm -f finalize-success.txt finalize-diagnostic.txt
             rmdir .github/workflows 2>/dev/null || true
             rmdir .github 2>/dev/null || true
             git add -A
