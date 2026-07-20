@@ -17,7 +17,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Reconstruct and unpack skill
+      - name: Reconstruct, validate, and unpack skill
         shell: bash
         run: |
           set -euo pipefail
@@ -26,20 +26,20 @@ jobs:
           rm -rf mysql-bug-analysis
           unzip -q /tmp/mysql-bug-analysis.zip
           test -f mysql-bug-analysis/SKILL.md
+          python3 -m pip install --disable-pip-version-check -r mysql-bug-analysis/requirements.txt
           python3 mysql-bug-analysis/scripts/self_check.py
+          PYTHONPATH=mysql-bug-analysis/scripts python3 -m unittest discover -s mysql-bug-analysis/tests -v
 
-      - name: Commit unpacked skill
+      - name: Commit complete skill and remove bootstrap files
         shell: bash
         run: |
           set -euo pipefail
+          rm -rf .bootstrap
+          rm -f .github/workflows/unpack-mysql-bug-analysis.yml
+          rmdir .github/workflows 2>/dev/null || true
+          rmdir .github 2>/dev/null || true
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add mysql-bug-analysis
-          if git diff --cached --quiet; then
-            echo 'No changes to commit'
-            exit 0
-          fi
-          git commit -m 'feat: add mysql bug analysis Codex skill'
+          git add -A
+          git commit -m 'feat: add complete mysql bug analysis Codex skill'
           git push
-
-# Triggered after all archive chunks are present.
