@@ -29,6 +29,7 @@ class TaskState:
             "bug_id": str(bug_id),
             "phase": "DISCOVER",
             "completed_phases": [],
+            "skipped_phases": [],
             "reproduced": False,
             "fix_validated": False,
             "confidence_level": "L5",
@@ -57,9 +58,25 @@ class TaskState:
     def complete_phase(self, phase: str) -> None:
         if phase not in PHASES:
             raise ValueError(f"Unknown phase: {phase}")
-        completed = self.data.setdefault("completed_phases", [])
+        if phase in self.data.setdefault("completed_phases", []):
+            return
+        if self.data.get("phase") != phase:
+            raise ValueError(f"Cannot complete {phase}; current phase is {self.data.get('phase')}")
+        completed = self.data["completed_phases"]
         if phase not in completed:
             completed.append(phase)
+        index = PHASES.index(phase)
+        self.data["phase"] = PHASES[min(index + 1, len(PHASES) - 1)]
+        self.save()
+
+    def skip_phase(self, phase: str, reason: str) -> None:
+        if not reason.strip():
+            raise ValueError("A non-empty skip reason is required")
+        if self.data.get("phase") != phase:
+            raise ValueError(f"Cannot skip {phase}; current phase is {self.data.get('phase')}")
+        self.data.setdefault("skipped_phases", []).append({
+            "phase": phase, "reason": reason.strip(), "at": utc_now(),
+        })
         index = PHASES.index(phase)
         self.data["phase"] = PHASES[min(index + 1, len(PHASES) - 1)]
         self.save()

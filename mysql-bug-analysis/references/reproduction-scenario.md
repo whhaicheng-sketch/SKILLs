@@ -1,15 +1,21 @@
 # Reproduction Scenario Schema
 
-A scenario is YAML with optional setup SQL, named concurrent sessions, and explicit success criteria.
+A scenario is YAML with optional setup SQL, named concurrent sessions, and non-empty explicit success criteria.
 
 ## Supported steps
 
 - `sql`: execute inline SQL with the MySQL client.
 - `sql_file`: execute a file relative to the scenario.
-- `shell`: execute a shell command relative to the scenario.
 - `sleep`: wait seconds.
 - `signal`: set a named in-process event.
 - `wait_for`: wait for a named event.
+
+## Supported success criteria
+
+- `error_log_contains`: a non-empty list of strings that must all occur in the error log.
+- `client_completed`: boolean stating whether all client sessions must complete without runner errors.
+
+Other observations or shell/protocol actions require a reviewed BUG-specific driver and cannot be declared as generic-runner steps or criteria.
 
 ## Example
 
@@ -33,4 +39,4 @@ success_criteria:
   error_log_contains: ["mysqld got signal 11"]
 ```
 
-The runner opens a new client process for each SQL step. For a transaction that must persist across statements, place all statements in one SQL step/file or create a BUG-specific driver script. Record manual session timing in the reproduction report.
+The runner opens one persistent client process per named session, so transactions, temporary tables, locks, and session variables survive across SQL steps. Different session names use independent connections.

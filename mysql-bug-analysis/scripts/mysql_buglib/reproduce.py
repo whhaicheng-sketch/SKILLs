@@ -13,7 +13,8 @@ import yaml
 
 from .command import run_command
 
-_ALLOWED_STEPS = {"sql", "sql_file", "shell", "sleep", "signal", "wait_for"}
+_ALLOWED_STEPS = {"sql", "sql_file", "sleep", "signal", "wait_for"}
+_ALLOWED_CRITERIA = {"error_log_contains", "client_completed"}
 
 
 def validate_scenario(scenario: dict[str, Any]) -> None:
@@ -22,6 +23,18 @@ def validate_scenario(scenario: dict[str, Any]) -> None:
     sessions = scenario.get("sessions", {})
     if not isinstance(sessions, dict):
         raise ValueError("sessions must be a mapping")
+    criteria = scenario.get("success_criteria")
+    if not isinstance(criteria, dict) or not criteria:
+        raise ValueError("success_criteria must be a non-empty mapping")
+    unknown = set(criteria) - _ALLOWED_CRITERIA
+    if unknown:
+        raise ValueError(f"Unsupported success criteria: {sorted(unknown)}")
+    if "error_log_contains" in criteria and not isinstance(criteria["error_log_contains"], list):
+        raise ValueError("error_log_contains must be a list")
+    if "error_log_contains" in criteria and not criteria["error_log_contains"]:
+        raise ValueError("error_log_contains must not be empty")
+    if "client_completed" in criteria and not isinstance(criteria["client_completed"], bool):
+        raise ValueError("client_completed must be boolean")
     for name, session in sessions.items():
         steps = session.get("steps", []) if isinstance(session, dict) else None
         if not isinstance(steps, list):
@@ -183,15 +196,6 @@ def run_scenario(scenario_path: Path, manifest: dict, mysql_client: Path, eviden
                     assert mysql_session is not None
                     sql = (scenario_path.parent / str(value)).read_text(encoding="utf-8")
                     local_results.append(mysql_session.execute(sql, index, timeout))
-                elif action == "shell":
-                    local_results.append(
-                        run_command(
-                            ["bash", "-lc", str(value)],
-                            cwd=scenario_path.parent,
-                            timeout=timeout,
-                            log_path=evidence_dir / f"{name}-{index}.json",
-                        )
-                    )
         except Exception as exc:  # capture all session failures as evidence
             with lock:
                 errors.append(f"{name}: {type(exc).__name__}: {exc}")
@@ -217,9 +221,13 @@ def run_scenario(scenario_path: Path, manifest: dict, mysql_client: Path, eviden
     error_log = Path(manifest["error_log"])
     error_text = error_log.read_text(encoding="utf-8", errors="replace") if error_log.exists() else ""
     criteria = scenario.get("success_criteria", {})
-    required_strings = criteria.get("error_log_contains", [])
-    matched = all(str(item) in error_text for item in required_strings)
-    success = matched and not alive if required_strings else not errors and not alive
-    result = {"success": success, "errors": errors, "sessions": session_results, "criteria": criteria}
+    observations: dict[str, bool] = {}
+    if "error_log_contains" in criteria:
+        required_strings = criteria["error_log_contains"]
+        observations["error_log_contains"] = bool(required_strings) and all(str(item) in error_text for item in required_strings)
+    if "client_completed" in criteria:
+        observations["client_completed"] = (not errors and not alive) == criteria["client_completed"]
+    success = bool(observations) and all(observations.values()) and not alive
+    result = {"success": success, "errors": errors, "sessions": session_results, "criteria": criteria, "observations": observations}
     (evidence_dir / "result.json").write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
     return result

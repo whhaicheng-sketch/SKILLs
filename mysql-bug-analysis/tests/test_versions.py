@@ -14,12 +14,12 @@ class VersionTests(unittest.TestCase):
         self.assertEqual(result["recommended_affected_version"], "8.0.31")
         self.assertEqual(result["recommended_fixed_version"], "8.0.33")
 
-    def test_uses_fixed_candidate_and_previous_mentioned_version(self):
+    def test_does_not_treat_a_mentioned_version_as_affected(self):
         result = resolve_version_roles(
             research={"versions_mentioned": ["8.0.30", "8.0.32"], "fixed_version_candidates": ["8.0.32"]},
             local_versions=[],
         )
-        self.assertEqual(result["recommended_affected_version"], "8.0.30")
+        self.assertIsNone(result["recommended_affected_version"])
         self.assertEqual(result["recommended_fixed_version"], "8.0.32")
 
     def test_does_not_guess_affected_version_from_local_inventory_only(self):

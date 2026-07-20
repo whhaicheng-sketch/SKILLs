@@ -15,18 +15,11 @@ def resolve_version_roles(*, research: dict, local_versions: list[str], affected
     local = _sort_versions([str(x) for x in local_versions])
     recommended_fixed = fixed or (fixed_candidates[0] if fixed_candidates else None)
     recommended_affected = affected
-    if recommended_affected is None:
-        candidates = [v for v in mentioned if v != recommended_fixed]
-        if recommended_fixed:
-            before = [v for v in candidates if _key(v) < _key(recommended_fixed)]
-            if before:
-                recommended_affected = before[-1]
-        if recommended_affected is None and candidates:
-            recommended_affected = candidates[0]
     return {
         "reported_versions": mentioned,
         "fixed_candidates": fixed_candidates,
         "local_versions": local,
         "recommended_affected_version": recommended_affected,
         "recommended_fixed_version": recommended_fixed,
+        "affected_candidates_requiring_verification": [v for v in mentioned if v != recommended_fixed],
     }

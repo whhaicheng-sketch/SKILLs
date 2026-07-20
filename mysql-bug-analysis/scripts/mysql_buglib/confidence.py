@@ -9,16 +9,17 @@ def evaluate_confidence(evidence: dict[str, Any]) -> dict[str, Any]:
     dynamic = bool(evidence.get("dynamic_evidence"))
     source = bool(evidence.get("source_evidence"))
     official = bool(evidence.get("official_evidence"))
+    official_fix_test = bool(evidence.get("official_fix_test_evidence"))
     forced = bool(evidence.get("mtr_or_fault_injection"))
     patch = bool(evidence.get("patch_evidence"))
 
     if reproduced and fixed and dynamic and source:
         level = "L1"
         reason = "受影响版本复现、修复版本验证、动态证据和源码证据形成闭环。"
-    elif (reproduced or forced) and source and (dynamic or patch):
+    elif forced and source and (dynamic or patch):
         level = "L2"
         reason = "通过真实复现、MTR、插桩或故障注入获得动态证据，并与源码或补丁一致。"
-    elif official and source and patch:
+    elif official and official_fix_test and source and patch and not reproduced:
         level = "L3"
         reason = "官方资料、修复补丁与源码调用链形成闭环，但未完成本地自然复现。"
     elif source:
